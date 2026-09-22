@@ -79,6 +79,7 @@ jobs:
         run: dotnet DriverCatalog.dll --version "${{ steps.version.outputs.version }}" --output driver-catalog.json
 
       - name: Create GitHub release
+        working-directory: ${{ runner.temp }}/publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
