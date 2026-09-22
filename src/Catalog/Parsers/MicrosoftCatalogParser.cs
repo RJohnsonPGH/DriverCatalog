@@ -19,6 +19,12 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
     private const string DetailUrlFormat = "https://www.microsoft.com/en-us/download/details.aspx?id={0}";
     private const string DetailsMarker = "window.__DLCDetails__=";
 
+    /// <summary>
+    /// Maximum number of detail pages retrieved at once. Bounds the load on Microsoft's servers
+    /// while still overlapping the network round trips that dominate parse time.
+    /// </summary>
+    private const int MaxConcurrentPageRequests = 8;
+
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <inheritdoc />
@@ -68,21 +74,24 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
 
         LogFoundDownloadPages(detailPages.Count);
 
-        int count = 0;
-        foreach (var (id, deviceName) in detailPages)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
+        // Retrieve every detail page concurrently with bounded parallelism. Capturing the page
+        // order up front keeps the emitted package sequence identical to a sequential run.
+        var pages = detailPages.ToList();
+        using var throttle = new SemaphoreSlim(MaxConcurrentPageRequests);
 
-            DriverPackage[]? packages;
-            try
-            {
-                packages = await ParseDetailPageAsync(httpClient, id, deviceName, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                LogFailedToParsePage(ex, id, deviceName);
-                continue;
-            }
+        var tasks = new Task<DriverPackage[]?>[pages.Count];
+        for (var i = 0; i < pages.Count; i++)
+        {
+            var (id, deviceName) = pages[i];
+            tasks[i] = FetchDetailPageAsync(throttle, httpClient, id, deviceName, cancellationToken);
+        }
+
+        await Task.WhenAll(tasks);
+
+        int count = 0;
+        foreach (var task in tasks)
+        {
+            var packages = await task;
 
             if (packages is null)
             {
@@ -97,6 +106,31 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
         }
 
         LogParsed(count);
+    }
+
+    /// <summary>
+    /// Retrieves and parses a single detail page, honoring the shared request throttle.
+    /// </summary>
+    private async Task<DriverPackage[]?> FetchDetailPageAsync(
+        SemaphoreSlim throttle, HttpClient httpClient, int detailId, string deviceName, CancellationToken cancellationToken)
+    {
+        await throttle.WaitAsync(cancellationToken);
+        try
+        {
+            try
+            {
+                return await ParseDetailPageAsync(httpClient, detailId, deviceName, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                LogFailedToParsePage(ex, detailId, deviceName);
+                return null;
+            }
+        }
+        finally
+        {
+            throttle.Release();
+        }
     }
 
     /// <summary>
