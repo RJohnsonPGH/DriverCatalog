@@ -92,7 +92,7 @@ jobs:
             "- Custom (manually curated) packages: \(.customPackageCount)" + "\n" +
             "- Generated packages overridden by custom packages: \(.overriddenPackageCount)" + "\n\n" +
             "| Manufacturer | Packages |\n|---|---|" +
-            (.packagesByManufacturer | to_entries | map("| \(.key) | \(.value) |") | join("\n"))
+            (.packageCountsByManufacturer | to_entries | map("| \(.key) | \(.value) |") | join("\n"))
           ' driver-catalog.json)
 
           gh release create "$VERSION" \
