@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 # Serialize runs so two concurrent runs can never compute the same version suffix.
 concurrency:
