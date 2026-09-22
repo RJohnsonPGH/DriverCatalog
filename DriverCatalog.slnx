@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DriverCatalog.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/DriverCatalog.Tests/DriverCatalog.Tests.csproj" />
+  </Folder>
+</Solution>

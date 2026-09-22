@@ -1,0 +1,100 @@
+name: Daily Driver Catalog
+
+on:
+  schedule:
+    # Runs daily at 03:00 UTC. Adjust as needed.
+    - cron: "0 3 * * *"
+  # Allows manual runs (e.g. to re-run after a parser fix or to publish an extra catalog for the day).
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# Serialize runs so two concurrent runs can never compute the same version suffix.
+concurrency:
+  group: daily-driver-catalog
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    name: Build catalog and publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0"
+
+      # Runs the xunit v3 test project directly (its executable is an MTP-compatible console app).
+      # Exits non-zero if any test fails.
+      - name: Run tests
+        run: dotnet run --project test/DriverCatalog.Tests -c Release
+
+      # The Dell and HP catalogs are CAB archives; the application extracts them with cabextract.
+      - name: Install cabextract
+        run: |
+          if ! command -v cabextract >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y cabextract
+          fi
+
+      - name: Publish application
+        run: dotnet publish src/DriverCatalog.csproj -c Release -o "${{ runner.temp }}/publish"
+
+      # Computes the catalog version as YYYY.MM.DD-XX. The date part is today (UTC) and XX is the
+      # next free sequence number for today, so repeated runs on the same day produce -01, -02, ...
+      - name: Determine catalog version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(date -u +%Y.%m.%d)
+          PREFIX="${DATE}-"
+
+          # Find the highest existing version suffix for today (e.g. 2026.09.20-03 -> 3).
+          MAX=0
+          for TAG in $(gh api --paginate "repos/${GITHUB_REPOSITORY}/tags?per_page=100" --jq '.[].name'); do
+            case "$TAG" in
+              "${PREFIX}"*)
+                SUFFIX="${TAG#${PREFIX}}"
+                if [[ "$SUFFIX" =~ ^[0-9]{2}$ ]]; then
+                  VALUE=$((10#$SUFFIX))
+                  if [ "$VALUE" -gt "$MAX" ]; then MAX=$VALUE; fi
+                fi
+                ;;
+            esac
+          done
+
+          NEXT=$((MAX + 1))
+          VERSION="${DATE}-$(printf '%02d' "$NEXT")"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Catalog version will be ${VERSION}"
+
+      - name: Build catalog
+        working-directory: ${{ runner.temp }}/publish
+        run: dotnet DriverCatalog.dll --version "${{ steps.version.outputs.version }}" --output driver-catalog.json
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          NOTES=$(jq -r '
+            "Driver catalog **\(.catalogVersion)**" + "\n\n" +
+            "- Generated at \(.generatedAtUtc)" + "\n" +
+            "- Total packages: \(.packageCount)" + "\n" +
+            "- Custom (manually curated) packages: \(.customPackageCount)" + "\n" +
+            "- Generated packages overridden by custom packages: \(.overriddenPackageCount)" + "\n\n" +
+            "| Manufacturer | Packages |\n|---|---|" +
+            (.packagesByManufacturer | to_entries | map("| \(.key) | \(.value) |") | join("\n"))
+          ' driver-catalog.json)
+
+          gh release create "$VERSION" \
+            --title "Driver Catalog ${VERSION}" \
+            --notes "$NOTES" \
+            driver-catalog.json

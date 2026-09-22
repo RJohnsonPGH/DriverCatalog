@@ -1,0 +1,25 @@
+// Example of a manually created driver package file.
+//
+// All *.json files in this directory (recursively) are ingested and merged into the emitted catalog.
+// Files whose name starts with an underscore are ignored, so this example is never included in the output.
+//
+// Each file must contain a JSON array of driver packages. Fields marked (required) must be present.
+// Property names are case-insensitive; enum values are matched by name (also case-insensitive).
+[
+  {
+    "manufacturer": "Lenovo",             // required: Dell | HP | Lenovo | Microsoft | Acer | VMware
+    "model": "ThinkPad X1 Carbon Gen 11", // required: device model name
+    "baseboards": ["21HM"],               // required: SKU / system IDs (use an empty array for universal packages)
+    "operatingSystems": ["Windows11"],    // required: e.g. Windows10, Windows11, WinPE10, WinPE11, Server2019, Server2022, Server2025, Legacy
+    "osBuild": "Build24H2",               // required: Build21H2 | Build22H2 | Build23H2 | Build24H2 | Build25H2 | Legacy | Any
+    "architecture": "x64",                // required: x86 | x64 | Arm64
+    "version": "3.100.22",                // required: driver package version
+    "isWinPE": false,                     // required
+    "isCab": false,                       // required: true for CAB packages, false for EXE packages
+    "downloadUrl": "https://example.com/drivers/thinkpad-x1c-g11-fingerprint-3.100.22.exe", // required
+    "releaseDate": "2026-05-01T00:00:00Z", // optional
+    "fileSize": 1234567,                  // optional, size in bytes
+    "filename": "ThinkPad_X1C_G11_Fingerprint_3.100.22.exe", // required
+    "hasSupplementalPackages": false      // optional (Lenovo GFX supplemental packages)
+  }
+]
