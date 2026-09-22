@@ -79,11 +79,11 @@ jobs:
         run: dotnet DriverCatalog.dll --version "${{ steps.version.outputs.version }}" --output driver-catalog.json
 
       - name: Create GitHub release
-        working-directory: ${{ runner.temp }}/publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          CATALOG="${{ runner.temp }}/publish/driver-catalog.json"
 
           NOTES=$(jq -r '
             "Driver catalog **\(.catalogVersion)**" + "\n\n" +
@@ -93,9 +93,9 @@ jobs:
             "- Generated packages overridden by custom packages: \(.overriddenPackageCount)" + "\n\n" +
             "| Manufacturer | Packages |\n|---|---|" +
             (.packageCountsByManufacturer | to_entries | map("| \(.key) | \(.value) |") | join("\n"))
-          ' driver-catalog.json)
+          ' "$CATALOG")
 
           gh release create "$VERSION" \
             --title "Driver Catalog ${VERSION}" \
             --notes "$NOTES" \
-            driver-catalog.json
+            "$CATALOG"
