@@ -1,10 +1,20 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace DriverCatalog.Models;
 
 /// <summary>
 /// Represents a driver package for a specific device model.
+/// Parsers yield <see cref="ProblematicDriverPackage"/> when they could not fully map a source entry.
 /// </summary>
-public sealed class DriverPackage
+public class DriverPackage
 {
+    /// <summary>
+    /// Gets a deterministic identifier for this package, derived from its parsed identity fields.
+    /// The same package always produces the same ID across catalog builds, even when its download URL changes.
+    /// </summary>
+    public string Id => ComputeId(Manufacturer, Model, Version, Architecture, OSBuild, OperatingSystems, Baseboards);
+
     /// <summary>
     /// Gets or sets the OEM manufacturer.
     /// </summary>
@@ -93,5 +103,32 @@ public sealed class DriverPackage
             ? string.Join("/", OperatingSystems)
             : "Unknown";
         return $"{Manufacturer} {Model} - {osList} {OSBuild} {Architecture} (v{Version})";
+    }
+
+    /// <summary>
+    /// Computes the package ID by hashing a canonical string of its identity fields.
+    /// List-valued fields are sorted and the whole string is lower-cased so the ID does not
+    /// depend on element order or casing.
+    /// </summary>
+    private static string ComputeId(
+        Manufacturer manufacturer,
+        string model,
+        string version,
+        Architecture architecture,
+        OSBuild osBuild,
+        List<Product> operatingSystems,
+        List<string> baseboards)
+    {
+        var canonical = string.Join("|",
+            manufacturer.ToString(),
+            model,
+            version,
+            architecture.ToString(),
+            osBuild.ToString(),
+            string.Join(",", operatingSystems.Select(p => (int)p).OrderBy(v => v)),
+            string.Join(",", baseboards.OrderBy(b => b, StringComparer.OrdinalIgnoreCase)))
+            .ToLowerInvariant();
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
 }

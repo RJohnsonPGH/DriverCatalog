@@ -10,4 +10,7 @@ public sealed partial class CatalogBuilderService
 
     [LoggerMessage(EventId = 3, Level = LogLevel.Information, Message = "Built catalog with {Total} package(s): {Generated} generated, {Custom} custom, {Overridden} overridden.")]
     private partial void LogCatalogBuilt(int total, int generated, int custom, int overridden);
+
+    [LoggerMessage(EventId = 4, Level = LogLevel.Warning, Message = "Found {Count} package(s) with unknown operating system or build values; they will be written to a separate file for triage.")]
+    private partial void LogProblematicPackagesFound(int count);
 }

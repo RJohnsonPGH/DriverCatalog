@@ -42,6 +42,15 @@ public static partial class CatalogRunner
         var writer = services.GetRequiredService<ICatalogWriter>();
         await writer.WriteAsync(catalogFile, outputPath, cancellationToken);
 
+        // Packages the parsers could not fully map get their own file (same shape as custom
+        // package files) so they can be pulled down and used to fix and test the parsers.
+        if (result.ProblematicPackages.Count > 0)
+        {
+            var problematicPath = Path.ChangeExtension(outputPath, ".problematic.json");
+            await writer.WritePackagesAsync(result.ProblematicPackages, problematicPath, cancellationToken);
+            LogProblematicPackagesWritten(logger, result.ProblematicPackages.Count, problematicPath);
+        }
+
         LogBuildCompleted(logger, result.Packages.Count, outputPath);
     }
 }

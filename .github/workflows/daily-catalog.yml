@@ -95,7 +95,58 @@ jobs:
             (.packageCountsByManufacturer | to_entries | map("| \(.key) | \(.value) |") | join("\n"))
           ' "$CATALOG")
 
+          # Packages the parsers could not fully map are written to a sibling file; attach it so
+          # they can be pulled down and used to fix and test the parsers.
+          ASSETS=("$CATALOG")
+          PROBLEMATIC="${{ runner.temp }}/publish/driver-catalog.problematic.json"
+          if [ -f "$PROBLEMATIC" ]; then
+            ASSETS+=("$PROBLEMATIC")
+          fi
+
           gh release create "$VERSION" \
             --title "Driver Catalog ${VERSION}" \
             --notes "$NOTES" \
-            "$CATALOG"
+            "${ASSETS[@]}"
+
+      # File a GitHub issue for each problematic package so parser gaps get fixed and tested.
+      # Open issues are matched by the package ID in the title, so re-runs don't duplicate them.
+      - name: File issues for problematic packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PROBLEMATIC="${{ runner.temp }}/publish/driver-catalog.problematic.json"
+
+          if [ ! -f "$PROBLEMATIC" ]; then
+            echo "No problematic packages; nothing to file."
+            exit 0
+          fi
+
+          COUNT=$(jq 'length' "$PROBLEMATIC")
+          echo "Found ${COUNT} problematic package(s)"
+
+          for i in $(seq 0 $((COUNT - 1))); do
+            ID=$(jq -r ".[$i].id" "$PROBLEMATIC")
+            REASON=$(jq -r ".[$i].errors[0] // \"unspecified reason\"" "$PROBLEMATIC")
+            ENTRY=$(jq ".[$i]" "$PROBLEMATIC")
+            SHORT_ID="${ID:0:12}"
+
+            EXISTING=$(gh issue list --state open \
+              --search "in:title \"driver-package ${SHORT_ID}\"" \
+              --json number --jq 'length')
+            if [ "$EXISTING" -gt 0 ]; then
+              echo "Open issue already exists for ${SHORT_ID}; skipping."
+              continue
+            fi
+
+            BODY="**Package ID:** \`${ID}\`
+
+            **Reason:** ${REASON}
+
+            \`\`\`json
+            ${ENTRY}
+            \`\`\`"
+
+            gh issue create \
+              --title "[driver-package ${SHORT_ID}] ${REASON}" \
+              --body "$BODY"
+          done

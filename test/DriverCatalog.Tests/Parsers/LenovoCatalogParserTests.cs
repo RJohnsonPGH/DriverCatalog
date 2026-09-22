@@ -24,7 +24,9 @@ public class LenovoCatalogParserTests
     {
         var packages = await ParseAsync();
 
-        Assert.Equal(2730, packages.Count);
+        // Older builds used to be consolidated into a single Legacy package per driver; each
+        // build now gets its own package, so the total is higher than in the original catalog.
+        Assert.Equal(2950, packages.Count);
     }
 
     [Fact]
@@ -58,13 +60,13 @@ public class LenovoCatalogParserTests
     }
 
     [Fact]
-    public async Task ParseFileAsync_MapsOlderWindows10BuildsToLegacy()
+    public async Task ParseFileAsync_MapsOlderWindows10BuildsToTheirOsBuildValues()
     {
         var packages = await ParseAsync();
 
-        var legacy = packages.Where(p => p.BuildNumber == "1909").ToList();
+        var older = packages.Where(p => p.BuildNumber == "1909").ToList();
 
-        Assert.Equal(160, legacy.Count);
-        Assert.All(legacy, package => Assert.Equal(OSBuild.Legacy, package.OSBuild));
+        Assert.Equal(199, older.Count);
+        Assert.All(older, package => Assert.Equal(OSBuild.Build1909, package.OSBuild));
     }
 }

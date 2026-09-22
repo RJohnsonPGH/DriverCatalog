@@ -103,6 +103,43 @@ public class CatalogBuilderServiceTests
     }
 
     [Fact]
+    public async Task BuildAsync_ReportsProblematicPackagesSeparately()
+    {
+        var unknownBuild = TestPackages.CreateProblematic("Unmapped build number 28000 for Windows11.", model: "Unknown Build", osBuild: OSBuild.Unknown);
+        var unknownOs = TestPackages.CreateProblematic("No operating system information.", model: "Unknown Os", operatingSystems: [Product.Unknown]);
+        var healthy = TestPackages.Create(model: "Healthy");
+
+        var service = CreateService(
+            [new StubParser([unknownBuild, unknownOs, healthy])],
+            Path.Combine(Path.GetTempPath(), "does-not-exist"));
+
+        var result = await service.BuildAsync(TestContext.Current.CancellationToken);
+
+        // Problematic packages remain part of the catalog...
+        Assert.Equal(3, result.Packages.Count);
+
+        // ...and are reported separately in catalog order.
+        Assert.Equal(["Unknown Build", "Unknown Os"], [.. result.ProblematicPackages.Select(p => p.Model)]);
+    }
+
+    [Fact]
+    public async Task BuildAsync_DoesNotReportPlainPackages_EvenWithUnknownValues()
+    {
+        // Unknown values on a plain package are an expected condition (e.g. date-stamped
+        // pre-2019 packages), not a parser gap, so they stay out of the triage file.
+        var unknownBuild = TestPackages.Create(model: "Unknown Build", osBuild: OSBuild.Unknown);
+
+        var service = CreateService(
+            [new StubParser([unknownBuild])],
+            Path.Combine(Path.GetTempPath(), "does-not-exist"));
+
+        var result = await service.BuildAsync(TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Packages);
+        Assert.Empty(result.ProblematicPackages);
+    }
+
+    [Fact]
     public async Task BuildAsync_Throws_WhenAParserProducesNoPackages()
     {
         var service = CreateService(

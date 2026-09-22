@@ -185,9 +185,9 @@ public sealed partial class HpWinPeCatalogParser(ILogger<HpWinPeCatalogParser> l
             "10/11" => [Product.WinPE10, Product.WinPE11],
             "11" => [Product.WinPE11],
             "10" => [Product.WinPE10],
-            "5" => [Product.LegacyWinPE], // WinPE 5 for early Windows 10
-            "4" => [Product.LegacyWinPE], // WinPE 4 = Windows 8/8.1
-            "3" => [Product.LegacyWinPE], // WinPE 3 = Windows 7
+            "5" => [Product.WinPE5], // WinPE 5 for early Windows 10
+            "4" => [Product.WinPE4], // WinPE 4 = Windows 8/8.1
+            "3" => [Product.WinPE3], // WinPE 3 = Windows 7
             _ => products
         };
 

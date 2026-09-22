@@ -96,9 +96,21 @@ public sealed partial class CatalogBuilderService(
             .GroupBy(p => p.Manufacturer)
             .ToDictionary(group => group.Key, group => group.Count());
 
+        // Packages the parsers could not fully map are kept in the catalog but also reported
+        // separately so they can be triaged (GitHub issues, parser fixes, test fixtures).
+        var problematicPackages = packages
+            .Where(p => p is ProblematicDriverPackage)
+            .Cast<ProblematicDriverPackage>()
+            .ToList();
+
         LogCatalogBuilt(packages.Count, generatedPackages.Count, customPackages.Count, overridden);
 
-        return new CatalogBuildResult(packages, generatedPackages.Count, customPackages.Count, overridden, countsByManufacturer);
+        if (problematicPackages.Count > 0)
+        {
+            LogProblematicPackagesFound(problematicPackages.Count);
+        }
+
+        return new CatalogBuildResult(packages, generatedPackages.Count, customPackages.Count, overridden, countsByManufacturer, problematicPackages);
     }
 
     /// <summary>

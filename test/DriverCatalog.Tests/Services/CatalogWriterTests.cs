@@ -46,8 +46,59 @@ public class CatalogWriterTests : IDisposable
         Assert.Equal("2026.09.21-01", loaded!.CatalogVersion);
         Assert.Equal(1, loaded.PackageCount);
         var item = Assert.Single(loaded.Packages);
-		Assert.Equal("Rounded Trip", item.Model);
+ 		Assert.Equal("Rounded Trip", item.Model);
         Assert.Equal("26100", loaded.Packages[0].BuildNumber);
+
+        // The ID is computed from the identity fields, so it must survive a round trip.
+        Assert.Equal(package.Id, item.Id);
+    }
+
+    [Fact]
+    public async Task WritePackagesAsync_IncludesErrors_ForProblematicPackages()
+    {
+        var packages = new[]
+        {
+            TestPackages.CreateProblematic("Unmapped build number 28000 for Windows11.", model: "P1", osBuild: OSBuild.Unknown),
+            TestPackages.CreateProblematic("No operating system information.", model: "P2", operatingSystems: [Product.Unknown])
+        };
+        var outputPath = Path.Combine(_directory, "problematic.json");
+        var writer = new CatalogWriter(NullLogger<CatalogWriter>.Instance);
+
+        await writer.WritePackagesAsync(packages, outputPath, TestContext.Current.CancellationToken);
+
+        Assert.True(File.Exists(outputPath));
+
+        var json = File.ReadAllText(outputPath);
+        Assert.Contains("\"errors\"", json);
+        Assert.Contains("Unmapped build number 28000 for Windows11.", json);
+
+        var loaded = JsonSerializer.Deserialize<List<ProblematicDriverPackage>>(json, CatalogJson.Options);
+        Assert.NotNull(loaded);
+        Assert.Equal(["P1", "P2"], [.. loaded!.Select(p => p.Model)]);
+        Assert.Equal(["Unmapped build number 28000 for Windows11."], loaded[0].Errors);
+    }
+
+    [Fact]
+    public async Task WritePackagesAsync_OmitsErrors_ForPlainPackages()
+    {
+        var packages = new[]
+        {
+            TestPackages.Create(model: "P1"),
+            TestPackages.Create(model: "P2")
+        };
+        var outputPath = Path.Combine(_directory, "plain.json");
+        var writer = new CatalogWriter(NullLogger<CatalogWriter>.Instance);
+
+        await writer.WritePackagesAsync(packages, outputPath, TestContext.Current.CancellationToken);
+
+        Assert.True(File.Exists(outputPath));
+
+        var json = File.ReadAllText(outputPath);
+        Assert.DoesNotContain("\"errors\"", json);
+
+        var loaded = JsonSerializer.Deserialize<List<DriverPackage>>(json, CatalogJson.Options);
+        Assert.NotNull(loaded);
+        Assert.Equal(["P1", "P2"], [.. loaded!.Select(p => p.Model)]);
     }
 
     [Fact]

@@ -7,4 +7,7 @@ public static partial class CatalogRunner
 
     [LoggerMessage(EventId = 2, Level = LogLevel.Information, Message = "Driver catalog build completed: {Count} package(s) written to {OutputPath}.")]
     private static partial void LogBuildCompleted(ILogger logger, int count, string outputPath);
+
+    [LoggerMessage(EventId = 3, Level = LogLevel.Warning, Message = "Wrote {Count} problematic package(s) (unknown OS or build) to {OutputPath}.")]
+    private static partial void LogProblematicPackagesWritten(ILogger logger, int count, string outputPath);
 }

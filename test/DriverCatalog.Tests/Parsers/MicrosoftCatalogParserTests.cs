@@ -157,16 +157,38 @@ public class MicrosoftCatalogParserTests
     }
 
     [Fact]
-    public async Task ParseAsync_DateStampedLegacyPackage_MapsToLegacy()
+    public async Task ParseAsync_DateStampedPackage_MapsToUnknownBuild_ButIsNotProblematic()
     {
         var packages = await ParseAsync();
 
         var package = packages.Single(p => p.Filename == "SurfacePro2_Win10_160501_2.zip");
 
-        Assert.Equal(OSBuild.Legacy, package.OSBuild);
+        // 160501 is a date stamp, not a Windows build number, so no build can be determined.
+        Assert.Equal(OSBuild.Unknown, package.OSBuild);
         Assert.Equal("160501", package.BuildNumber);
         Assert.Equal([Product.Windows10], package.OperatingSystems);
         Assert.Equal("2", package.Version);
+
+        // Date stamps are an expected condition for pre-2019 packages, not a parser gap.
+        Assert.False(package is ProblematicDriverPackage);
+    }
+
+    [Fact]
+    public async Task ParseAsync_PreWindows10OsTokens_MapToExplicitProducts()
+    {
+        var pages = StandardPages();
+        pages["/en-us/download/details.aspx?id=103"] = DetailPage(
+            "Surface Pro 2",
+            "SurfacePro2_Win8_160501_2.zip",
+            "SurfacePro2_Win7_160501_2.zip");
+
+        var packages = await ParseAsync(pages);
+
+        var win8 = packages.Single(p => p.Filename == "SurfacePro2_Win8_160501_2.zip");
+        Assert.Equal([Product.Windows8], win8.OperatingSystems);
+
+        var win7 = packages.Single(p => p.Filename == "SurfacePro2_Win7_160501_2.zip");
+        Assert.Equal([Product.Windows7], win7.OperatingSystems);
     }
 
     [Fact]
@@ -179,6 +201,17 @@ public class MicrosoftCatalogParserTests
         Assert.Equal(OSBuild.Unknown, package.OSBuild);
         Assert.Equal("28000", package.BuildNumber);
         Assert.Equal(Architecture.Arm64, package.Architecture);
+    }
+
+    [Fact]
+    public async Task ParseAsync_UnknownBuild_YieldsProblematicPackageWithTheReason()
+    {
+        var packages = await ParseAsync();
+
+        var problematic = Assert.IsType<ProblematicDriverPackage>(
+            packages.Single(p => p.Filename == "SurfaceLaptop8withSnapdragon_Win11_28000_26.083.28964.0.msi"));
+
+        Assert.Contains("28000", problematic.Errors[0]);
     }
 
     [Fact]

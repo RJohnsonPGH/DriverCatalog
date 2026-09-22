@@ -234,6 +234,8 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
             return false;
         }
 
+        var errors = new List<string>();
+
         List<Product> products;
         if (parsed.Products.Count > 0)
         {
@@ -247,6 +249,7 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
         {
             LogNoOsInformation(file.Name);
             products = [Product.Unknown];
+            errors.Add($"No operating system information in file name '{file.Name}' or on the detail page.");
         }
 
         OSBuild osBuild;
@@ -261,6 +264,7 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
             {
                 LogUnmappedBuild(buildNumber, products[0], file.Name);
                 osBuild = OSBuild.Unknown;
+                errors.Add($"Unmapped build number {buildNumber} for {products[0]}.");
             }
         }
         else
@@ -289,7 +293,7 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
             fileSize = size;
         }
 
-        package = new DriverPackage
+        var parsedPackage = new DriverPackage
         {
             Manufacturer = Manufacturer.Microsoft,
             Model = model,
@@ -307,13 +311,19 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
             Filename = file.Name
         };
 
+        // Note: date-stamped pre-2019 packages map to OSBuild.Unknown on purpose and are not
+        // problematic - there is no build number to map and nothing for the parser to fix.
+        package = errors.Count > 0
+            ? ProblematicDriverPackage.Create(parsedPackage, errors)
+            : parsedPackage;
+
         LogParsedPackage(file.Name, model);
         return true;
     }
 
     /// <summary>
     /// Parses a Surface package file name into its constituent parts.
-    /// Standard convention: Product_Win{10|11}_{build number}_{version}.(msi|zip), where the OS and
+    /// Standard convention: Product_Win{7|8|10|11}_{build number}_{version}.(msi|zip), where the OS and
     /// architecture tokens may repeat or appear in either order, e.g.
     /// SurfaceThunderbolt4DockSEMMforDock_Win10_Win11_x64_19041_23.033.35296.0.msi.
     /// Pre-2019 packages use a date stamp instead of a build number and may be zip files,
@@ -354,16 +364,19 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
             {
                 lastOsIndex = i;
 
-                var product = token.ToUpperInvariant() switch
+                Product? product = token.ToUpperInvariant() switch
                 {
+                    "WIN7" => Product.Windows7,
+                    "WIN8" => Product.Windows8,
+                    "WIN81" => Product.Windows81,
                     "WIN10" => Product.Windows10,
                     "WIN11" => Product.Windows11,
-                    _ => Product.Legacy
+                    _ => null // Unrecognized OS token: no matching Product value exists.
                 };
 
-                if (!products.Contains(product))
+                if (product is { } mapped && !products.Contains(mapped))
                 {
-                    products.Add(product);
+                    products.Add(mapped);
                 }
             }
             else if (ArchitectureTokenRegex().IsMatch(token))
@@ -448,20 +461,21 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
     {
         osBuild = OSBuild.Unknown;
 
-        // Pre-2019 packages carry a date stamp (e.g. 160501) rather than a Windows build number.
+        // Pre-2019 packages carry a date stamp (e.g. 160501) rather than a Windows build number,
+        // so no build can be determined; the raw value is preserved in BuildNumber.
         if (buildNumber >= 100000)
         {
-            osBuild = OSBuild.Legacy;
+            osBuild = OSBuild.Unknown;
             return true;
         }
 
         var mapped = (product, buildNumber) switch
         {
             // Windows 10
-            (Product.Windows10, 17763) => OSBuild.Legacy,   // 1809 / LTSC 2019
-            (Product.Windows10, 18362) => OSBuild.Legacy,   // 1903
-            (Product.Windows10, 19041) => OSBuild.Legacy,   // 20H2
-            (Product.Windows10, 19042) => OSBuild.Legacy,   // Surface Go 20H2 variant
+            (Product.Windows10, 17763) => OSBuild.Build1809,  // 1809 / LTSC 2019
+            (Product.Windows10, 18362) => OSBuild.Build1903,
+            (Product.Windows10, 19041) => OSBuild.Build20H2,
+            (Product.Windows10, 19042) => OSBuild.Build20H2,  // Surface Go 20H2 variant
             (Product.Windows10, 19043) => OSBuild.Build21H2,
             (Product.Windows10, 19044) => OSBuild.Build21H2,
             (Product.Windows10, 19045) => OSBuild.Build22H2,
@@ -504,7 +518,7 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
 	[GeneratedRegex(@"details\.aspx\?id=(\d+)", RegexOptions.Compiled)]
 	private static partial Regex DetailsPageIdRegex();
 
-	[GeneratedRegex(@"^Win\d{2}$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+	[GeneratedRegex(@"^Win\d{1,2}$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
 	private static partial Regex OsTokenRegex();
 
 	[GeneratedRegex(@"^\d+$", RegexOptions.Compiled)]

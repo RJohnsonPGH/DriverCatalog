@@ -9,15 +9,6 @@ namespace DriverCatalog.Catalog.Parsers;
 /// </summary>
 public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> logger, ICatalogDownloader catalogDownloader) : ICatalogParser
 {
-    /// <summary>
-    /// Windows 10 build versions that predate the oldest build with a dedicated <see cref="OSBuild"/> value.
-    /// These are mapped to <see cref="OSBuild.Legacy"/> instead of being skipped.
-    /// </summary>
-    private static readonly HashSet<string> LegacyBuilds = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "1507", "1607", "1703", "1709", "1803", "1809", "1903", "1909", "2004", "20H2", "21H1"
-    };
-
     /// <inheritdoc />
     public async IAsyncEnumerable<DriverPackage> ParseAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -92,6 +83,7 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
         var tempPackages = new List<(
             Product OperatingSystem,
             OSBuild OSBuild,
+            string? Error,
             string? BuildNumber,
             string Model,
             List<string> Baseboards,
@@ -136,7 +128,7 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
                 continue;
             }
 
-            if (!TryParseOsInfo(osName, osVersion, out var os, out var build))
+            if (!TryParseOsInfo(osName, osVersion, out var os, out var build, out var error))
                 continue;
 
             // The raw version value used to determine the OSBuild (e.g. "24H2", "*", "1909").
@@ -152,6 +144,7 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
             tempPackages.Add((
                 os,
                 build,
+                error,
                 buildNumber,
                 modelName,
                 types,
@@ -178,31 +171,44 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
                 p.FileName,
                 p.HasSupplementalPackages
             })
-            .Select(group => new DriverPackage
+            .Select(group =>
             {
-                Manufacturer = Manufacturer.Lenovo,
-                Model = group.Key.Model,
-                Baseboards = group.First().Baseboards,
-                OperatingSystems = [.. group.Select(p => p.OperatingSystem).Distinct()],
-                OSBuild = group.Key.OSBuild,
-                BuildNumber = group.First().BuildNumber,
-                Architecture = group.Key.Architecture,
-                Version = group.Key.Version,
-                IsWinPE = false, // Lenovo catalog parser does not handle WinPE packages
-                IsCab = false,
-                DownloadUrl = group.Key.DownloadUrl,
-                ReleaseDate = group.Key.ReleaseDate,
-                Filename = group.Key.FileName,
-                HasSupplementalPackages = group.Key.HasSupplementalPackages
+                var package = new DriverPackage
+                {
+                    Manufacturer = Manufacturer.Lenovo,
+                    Model = group.Key.Model,
+                    Baseboards = group.First().Baseboards,
+                    OperatingSystems = [.. group.Select(p => p.OperatingSystem).Distinct()],
+                    OSBuild = group.Key.OSBuild,
+                    BuildNumber = group.First().BuildNumber,
+                    Architecture = group.Key.Architecture,
+                    Version = group.Key.Version,
+                    IsWinPE = false, // Lenovo catalog parser does not handle WinPE packages
+                    IsCab = false,
+                    DownloadUrl = group.Key.DownloadUrl,
+                    ReleaseDate = group.Key.ReleaseDate,
+                    Filename = group.Key.FileName,
+                    HasSupplementalPackages = group.Key.HasSupplementalPackages
+                };
+
+                // The consolidated package is problematic when any source row could not be fully mapped.
+                var errors = group.Select(p => p.Error)
+                    .Where(e => e is not null)
+                    .Select(e => e!)
+                    .Distinct()
+                    .ToList();
+
+                return errors.Count > 0 ? ProblematicDriverPackage.Create(package, errors) : package;
             })
             .ToList();
 
         return consolidatedPackages;
     }
 
-    private bool TryParseOsInfo(string osName, string osVersion, out Product product, out OSBuild build)
+    private bool TryParseOsInfo(string osName, string osVersion, out Product product, out OSBuild build, out string? error)
     {
         LogParsingOsInfo(osName, osVersion);
+        error = null;
 
         product = Product.Windows10;
         build = OSBuild.Build22H2;
@@ -223,35 +229,14 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
         }
 
         // Parse build from version (e.g., "21H2", "22H2", etc.)
-        if (osVersion.Contains("21H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build21H2;
-        }
-        else if (osVersion.Contains("22H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build22H2;
-        }
-        else if (osVersion.Contains("23H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build23H2;
-        }
-        else if (osVersion.Contains("24H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build24H2;
-        }
-        else if (osVersion.Contains("25H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build25H2;
-        }
-        else if (string.Equals(osVersion, "*", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(osVersion, "*", StringComparison.OrdinalIgnoreCase))
         {
             // Wildcard version: the driver pack supports any build.
             build = OSBuild.Any;
         }
-        else if (LegacyBuilds.Contains(osVersion))
+        else if (OSBuildExtensions.TryMapBuildToken(osVersion, out var knownBuild))
         {
-            // Older Windows 10 builds don't have a dedicated OSBuild value.
-            build = OSBuild.Legacy;
+            build = knownBuild.Value;
         }
         else
         {
@@ -259,6 +244,7 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
             // Keep the package but flag it so the new value can be added to the enum.
             LogUnrecognizedOsVersion(osVersion, osName);
             build = OSBuild.Unknown;
+            error = $"Unrecognized OS version '{osVersion}' for {product}.";
         }
 
         LogParsedOsInfo(product, build);

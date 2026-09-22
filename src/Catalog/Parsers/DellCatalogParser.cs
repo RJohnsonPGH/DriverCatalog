@@ -257,12 +257,34 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
             return true;
         }
 
-        if (osCode.Contains("Windows8", StringComparison.OrdinalIgnoreCase) ||
-            osCode.Contains("Windows7", StringComparison.OrdinalIgnoreCase) ||
-            osCode.Contains("Vista", StringComparison.OrdinalIgnoreCase) ||
-            osCode.Contains("XP", StringComparison.OrdinalIgnoreCase))
+        // "Windows8.1" must be checked before "Windows8" because it contains that string.
+        if (osCode.Contains("Windows8.1", StringComparison.OrdinalIgnoreCase))
         {
-            product = Product.Legacy;
+            product = Product.Windows81;
+            return true;
+        }
+
+        if (osCode.Contains("Windows8", StringComparison.OrdinalIgnoreCase))
+        {
+            product = Product.Windows8;
+            return true;
+        }
+
+        if (osCode.Contains("Windows7", StringComparison.OrdinalIgnoreCase))
+        {
+            product = Product.Windows7;
+            return true;
+        }
+
+        if (osCode.Contains("Vista", StringComparison.OrdinalIgnoreCase))
+        {
+            product = Product.Vista;
+            return true;
+        }
+
+        if (osCode.Contains("XP", StringComparison.OrdinalIgnoreCase))
+        {
+            product = Product.Xp;
             return true;
         }
 
@@ -278,11 +300,21 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
             return true;
         }
 
-        if (osCode.Contains("winpe3x", StringComparison.OrdinalIgnoreCase) ||
-            osCode.Contains("winpe4x", StringComparison.OrdinalIgnoreCase) ||
-            osCode.Contains("winpe5x", StringComparison.OrdinalIgnoreCase))
+        if (osCode.Contains("winpe3x", StringComparison.OrdinalIgnoreCase))
         {
-            product = Product.LegacyWinPE;
+            product = Product.WinPE3;
+            return true;
+        }
+
+        if (osCode.Contains("winpe4x", StringComparison.OrdinalIgnoreCase))
+        {
+            product = Product.WinPE4;
+            return true;
+        }
+
+        if (osCode.Contains("winpe5x", StringComparison.OrdinalIgnoreCase))
+        {
+            product = Product.WinPE5;
             return true;
         }
 
@@ -292,8 +324,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
     /// <summary>
     /// Determines if a product is a WinPE variant.
     /// </summary>
-    private static bool IsWinPEProduct(Product product) =>
-        product is Product.WinPE10 or Product.WinPE11 or Product.LegacyWinPE;
+    private static bool IsWinPEProduct(Product product) => product.IsWinPE();
 
     /// <summary>
     /// Extracts common package information shared by both WinPE and Windows packages.

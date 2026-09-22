@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Xml.XPath;
 using DriverCatalog.Models;
@@ -9,15 +10,6 @@ namespace DriverCatalog.Catalog.Parsers;
 /// </summary>
 public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICatalogDownloader catalogDownloader) : ICatalogParser
 {
-    /// <summary>
-    /// Windows 10 build versions that predate the oldest build with a dedicated <see cref="OSBuild"/> value.
-    /// These are mapped to <see cref="OSBuild.Legacy"/> instead of being silently mislabeled.
-    /// </summary>
-    private static readonly HashSet<string> LegacyBuilds = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "1507", "1607", "1703", "1709", "1803", "1809", "1903", "1909", "2004", "20H2", "21H1"
-    };
-
     /// <summary>
     /// Internal model to store HP OS metadata from the catalog.
     /// </summary>
@@ -116,6 +108,7 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
         var tempPackages = new List<(
             Product OperatingSystem,
             OSBuild OSBuild,
+            string? Error,
             string? BuildNumber,
             string Model,
             List<string> Baseboards,
@@ -161,13 +154,14 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
             Product os;
             OSBuild build;
             string? buildNumber;
+            string? error = null;
 
             if (!string.IsNullOrWhiteSpace(osId) && osMetadata.TryGetValue(osId, out var osMetadataEntry))
             {
                 // Use the detailed OS metadata we parsed earlier
                 LogUsingOsMetadata(osId, osMetadataEntry.Name);
 
-                if (!TryParseOsInfo(osMetadataEntry.Name, out os, out build))
+                if (!TryParseOsInfo(osMetadataEntry.Name, out os, out build, out error))
                 {
                     // If we can't parse the OS metadata name, fall back to OSName element
                     var osNameNode = nav.SelectSingleNode("OSName");
@@ -179,7 +173,7 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
                         continue;
                     }
 
-                    if (!TryParseOsInfo(osName, out os, out build))
+                    if (!TryParseOsInfo(osName, out os, out build, out error))
                     {
                         skipped++;
                         continue;
@@ -211,7 +205,7 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
                     continue;
                 }
 
-                if (!TryParseOsInfo(osName, out os, out build))
+                if (!TryParseOsInfo(osName, out os, out build, out error))
                 {
                     skipped++;
                     continue;
@@ -364,6 +358,7 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
             tempPackages.Add((
                 os,
                 build,
+                error,
                 buildNumber,
                 systemName,
                 systemIds,
@@ -391,21 +386,33 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
                 p.ReleaseDate,
                 p.FileName
             })
-            .Select(group => new DriverPackage
+            .Select(group =>
             {
-                Manufacturer = Manufacturer.HP,
-                Model = group.Key.Model,
-                Baseboards = group.First().Baseboards,
-                OperatingSystems = [.. group.Select(p => p.OperatingSystem).Distinct()],
-                OSBuild = group.Key.OSBuild,
-                BuildNumber = group.First().BuildNumber,
-                Architecture = group.Key.Architecture,
-                Version = group.Key.Version,
-                IsWinPE = false, // HP catalog parser does not handle WinPE packages
-                IsCab = false,
-                DownloadUrl = group.Key.DownloadUrl,
-                ReleaseDate = group.Key.ReleaseDate,
-                Filename = group.Key.FileName,
+                var package = new DriverPackage
+                {
+                    Manufacturer = Manufacturer.HP,
+                    Model = group.Key.Model,
+                    Baseboards = group.First().Baseboards,
+                    OperatingSystems = [.. group.Select(p => p.OperatingSystem).Distinct()],
+                    OSBuild = group.Key.OSBuild,
+                    BuildNumber = group.First().BuildNumber,
+                    Architecture = group.Key.Architecture,
+                    Version = group.Key.Version,
+                    IsWinPE = false, // HP catalog parser does not handle WinPE packages
+                    IsCab = false,
+                    DownloadUrl = group.Key.DownloadUrl,
+                    ReleaseDate = group.Key.ReleaseDate,
+                    Filename = group.Key.FileName,
+                };
+
+                // The consolidated package is problematic when any source row could not be fully mapped.
+                var errors = group.Select(p => p.Error)
+                    .Where(e => e is not null)
+                    .Select(e => e!)
+                    .Distinct()
+                    .ToList();
+
+                return errors.Count > 0 ? ProblematicDriverPackage.Create(package, errors) : package;
             })
             .ToList();
 
@@ -537,9 +544,10 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
         LogParsedSoftPaqMetadata(softPaqCount);
     }
 
-    private bool TryParseOsInfo(string osName, out Product product, out OSBuild build)
+    private bool TryParseOsInfo(string osName, out Product product, out OSBuild build, out string? error)
     {
         LogParsingOsName(osName);
+        error = null;
 
         // HP uses format like "Windows 10 22H2", "Windows 11 23H2"
         if (osName.Contains("Windows 11", StringComparison.OrdinalIgnoreCase) ||
@@ -561,46 +569,46 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
         }
 
         // Parse build version. Every branch assigns explicitly - there is intentionally no silent default.
-        if (osName.Contains("LTSC", StringComparison.OrdinalIgnoreCase) ||
-            osName.Contains("LTSB", StringComparison.OrdinalIgnoreCase))
+        if (OSBuildExtensions.TryMapBuildToken(osName, out var tokenBuild))
         {
-            // IoT Enterprise editions are long-term servicing releases, even when the name
-            // also carries a feature-update token (e.g. "Windows 11 IoT Enterprise 24H2 LTSC").
-            build = OSBuild.Legacy;
+            build = tokenBuild.Value;
         }
-        else if (osName.Contains("21H2", StringComparison.OrdinalIgnoreCase))
+        else if (TryMapLtscYear(osName, out var ltscBuild))
         {
-            build = OSBuild.Build21H2;
-        }
-        else if (osName.Contains("22H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build22H2;
-        }
-        else if (osName.Contains("23H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build23H2;
-        }
-        else if (osName.Contains("24H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build24H2;
-        }
-        else if (osName.Contains("25H2", StringComparison.OrdinalIgnoreCase))
-        {
-            build = OSBuild.Build25H2;
-        }
-        else if (LegacyBuilds.Any(legacyBuild => osName.Contains(legacyBuild, StringComparison.OrdinalIgnoreCase)))
-        {
-            // Older Windows 10 builds don't have a dedicated OSBuild value.
-            build = OSBuild.Legacy;
+            // LTSC/LTSB names carry the release year rather than a build token, so map the year
+            // to the build it shipped on (e.g. "Windows 10 IoT Enterprise 2019 LTSC" is build 1809).
+            build = ltscBuild.Value;
         }
         else
         {
             // Unrecognized build (e.g. a newer release not yet represented in OSBuild).
             LogUnrecognizedOsBuild(osName);
             build = OSBuild.Unknown;
+            error = $"Unrecognized OS build in '{osName}'.";
         }
 
         LogParsedOsInfo(product, build);
         return true;
+    }
+
+    /// <summary>
+    /// Maps an LTSC/LTSB operating system name to the build its release year shipped on.
+    /// </summary>
+    private static bool TryMapLtscYear(string osName, [NotNullWhen(true)] out OSBuild? ltscBuild)
+    {
+        ltscBuild = null;
+
+        if (!osName.Contains("LTSC", StringComparison.OrdinalIgnoreCase) &&
+            !osName.Contains("LTSB", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        ltscBuild = osName.Contains("2016", StringComparison.Ordinal) ? OSBuild.Build1607
+            : osName.Contains("2019", StringComparison.Ordinal) ? OSBuild.Build1809
+            : osName.Contains("2021", StringComparison.Ordinal) ? OSBuild.Build20H2
+            : null;
+
+        return ltscBuild is not null;
     }
 }
