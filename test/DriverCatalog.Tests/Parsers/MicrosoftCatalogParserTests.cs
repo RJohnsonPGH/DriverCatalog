@@ -192,26 +192,44 @@ public class MicrosoftCatalogParserTests
     }
 
     [Fact]
-    public async Task ParseAsync_UnknownBuild_MapsToUnknown_AndKeepsTheRawValue()
+    public async Task ParseAsync_Build28000_MapsToBuild26H1_AndIsNotProblematic()
     {
         var packages = await ParseAsync();
 
         var package = packages.Single(p => p.Filename == "SurfaceLaptop8withSnapdragon_Win11_28000_26.083.28964.0.msi");
 
-        Assert.Equal(OSBuild.Unknown, package.OSBuild);
+        Assert.Equal(OSBuild.Build26H1, package.OSBuild);
         Assert.Equal("28000", package.BuildNumber);
         Assert.Equal(Architecture.Arm64, package.Architecture);
+        Assert.False(package is ProblematicDriverPackage);
     }
 
     [Fact]
-    public async Task ParseAsync_UnknownBuild_YieldsProblematicPackageWithTheReason()
+    public async Task ParseAsync_StandardCatalog_HasNoProblematicPackages()
     {
         var packages = await ParseAsync();
 
-        var problematic = Assert.IsType<ProblematicDriverPackage>(
-            packages.Single(p => p.Filename == "SurfaceLaptop8withSnapdragon_Win11_28000_26.083.28964.0.msi"));
+        Assert.DoesNotContain(packages, p => p is ProblematicDriverPackage);
+    }
 
-        Assert.Contains("28000", problematic.Errors[0]);
+    [Fact]
+    public async Task ParseAsync_UnknownBuild_MapsToUnknown_AndYieldsProblematicPackageWithTheReason()
+    {
+        // The standard catalog contains only known builds; a synthetic page with an unmapped
+        // build number keeps the problematic-package path covered.
+        var pages = StandardPages();
+        pages["/en-us/download/details.aspx?id=103"] = DetailPage(
+            "Surface Laptop 8th Edition with Snapdragon",
+            "SurfaceLaptop8withSnapdragon_Win11_29000_26.093.29001.0.msi");
+
+        var packages = await ParseAsync(pages);
+
+        var problematic = Assert.IsType<ProblematicDriverPackage>(
+            packages.Single(p => p.Filename == "SurfaceLaptop8withSnapdragon_Win11_29000_26.093.29001.0.msi"));
+
+        Assert.Equal(OSBuild.Unknown, problematic.OSBuild);
+        Assert.Equal("29000", problematic.BuildNumber);
+        Assert.Contains("29000", problematic.Errors[0]);
     }
 
     [Fact]
