@@ -487,6 +487,7 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
             (Product.Windows11, 22631) => OSBuild.Build24H2,
             (Product.Windows11, 26100) => OSBuild.Build24H2,
             (Product.Windows11, 26200) => OSBuild.Build25H2,
+            (Product.Windows11, 28000) => OSBuild.Build26H1,
 
             _ => OSBuild.Unknown
         };

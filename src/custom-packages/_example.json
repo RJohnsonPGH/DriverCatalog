@@ -11,7 +11,7 @@
     "model": "ThinkPad X1 Carbon Gen 11", // required: device model name
     "baseboards": ["21HM"],               // required: SKU / system IDs (use an empty array for universal packages)
     "operatingSystems": ["Windows11"],    // required: e.g. Xp, Vista, Windows7, Windows8, Windows81, Windows10, Windows11, WinPE3, WinPE4, WinPE5, WinPE10, WinPE11, Server2019, Server2022, Server2025
-    "osBuild": "Build24H2",               // required: Build1507 | Build1607 | Build1703 | Build1709 | Build1803 | Build1809 | Build1903 | Build1909 | Build2004 | Build20H2 | Build21H1 | Build21H2 | Build22H2 | Build23H2 | Build24H2 | Build25H2 | Any | Unknown
+    "osBuild": "Build24H2",               // required: Build1507 | Build1607 | Build1703 | Build1709 | Build1803 | Build1809 | Build1903 | Build1909 | Build2004 | Build20H2 | Build21H1 | Build21H2 | Build22H2 | Build23H2 | Build24H2 | Build25H2 | Build26H1 | Any | Unknown
     "architecture": "x64",                // required: x86 | x64 | Arm64
     "version": "3.100.22",                // required: driver package version
     "isWinPE": false,                     // required
