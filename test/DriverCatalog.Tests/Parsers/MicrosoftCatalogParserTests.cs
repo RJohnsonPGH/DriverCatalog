@@ -205,6 +205,25 @@ public class MicrosoftCatalogParserTests
     }
 
     [Fact]
+    public async Task ParseAsync_Build26300_MapsToBuild26H2_AndIsNotProblematic()
+    {
+        var pages = StandardPages();
+        pages["/en-us/download/details.aspx?id=103"] = DetailPage(
+            "Surface Pro for Business 13th Edition with Intel",
+            "SurfacePro13withIntel_Win11_26300_26.103.29041.0.msi");
+
+        var packages = await ParseAsync(pages);
+
+        var package = packages.Single(p => p.Filename == "SurfacePro13withIntel_Win11_26300_26.103.29041.0.msi");
+
+        Assert.Equal(OSBuild.Build26H2, package.OSBuild);
+        Assert.Equal("26300", package.BuildNumber);
+        Assert.Equal([Product.Windows11], package.OperatingSystems);
+        Assert.Equal("26.103.29041.0", package.Version);
+        Assert.False(package is ProblematicDriverPackage);
+    }
+
+    [Fact]
     public async Task ParseAsync_StandardCatalog_HasNoProblematicPackages()
     {
         var packages = await ParseAsync();

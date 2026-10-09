@@ -26,7 +26,7 @@ public class HpCatalogParserTests
 
         // Older builds used to be consolidated into a single Legacy package per driver; each
         // build now gets its own package, so the total is higher than in the original catalog.
-        Assert.Equal(4214, packages.Count);
+        Assert.Equal(4113, packages.Count);
     }
 
     [Fact]
@@ -44,8 +44,30 @@ public class HpCatalogParserTests
 
         var build24H2 = packages.Where(p => p.BuildNumber == "Windows 11 64-bit, 24H2").ToList();
 
-        Assert.Equal(215, build24H2.Count);
+        Assert.Equal(240, build24H2.Count);
         Assert.All(build24H2, package => Assert.Equal(OSBuild.Build24H2, package.OSBuild));
+    }
+
+    [Fact]
+    public async Task ParseFileAsync_MapsBuild26H2ToItsOsBuildValue()
+    {
+        var packages = await ParseAsync();
+
+        var build26H2 = packages.Where(p => p.BuildNumber == "Windows 11 64-bit, 26H2").ToList();
+
+        Assert.Equal(8, build26H2.Count);
+        Assert.All(build26H2, package => Assert.Equal(OSBuild.Build26H2, package.OSBuild));
+
+        // A build token that was once unmapped must not leak into the triage file.
+        Assert.All(build26H2, package => Assert.False(package is ProblematicDriverPackage));
+    }
+
+    [Fact]
+    public async Task ParseFileAsync_SampleCatalog_HasNoProblematicPackages()
+    {
+        var packages = await ParseAsync();
+
+        Assert.DoesNotContain(packages, p => p is ProblematicDriverPackage);
     }
 
     [Fact]
@@ -76,7 +98,7 @@ public class HpCatalogParserTests
 
         var older = packages.Where(p => p.BuildNumber == "Windows 10 64-bit, 1909").ToList();
 
-        Assert.Equal(318, older.Count);
+        Assert.Equal(300, older.Count);
         Assert.All(older, package => Assert.Equal(OSBuild.Build1909, package.OSBuild));
     }
 
