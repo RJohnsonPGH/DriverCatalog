@@ -92,6 +92,11 @@ public enum OSBuild
     /// </summary>
     Build26H1,
 
+    /// <summary>
+    /// Windows 11 26H2
+    /// </summary>
+    Build26H2,
+
     Any = 200,
 
     /// <summary>
@@ -127,6 +132,7 @@ public static class OSBuildExtensions
         ["24H2"] = OSBuild.Build24H2,
         ["25H2"] = OSBuild.Build25H2,
         ["26H1"] = OSBuild.Build26H1,
+        ["26H2"] = OSBuild.Build26H2,
     };
 
     /// <summary>

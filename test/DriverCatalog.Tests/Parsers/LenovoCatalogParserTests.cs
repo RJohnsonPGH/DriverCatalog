@@ -38,6 +38,14 @@ public class LenovoCatalogParserTests
     }
 
     [Fact]
+    public async Task ParseFileAsync_SampleCatalog_HasNoProblematicPackages()
+    {
+        var packages = await ParseAsync();
+
+        Assert.DoesNotContain(packages, p => p is ProblematicDriverPackage);
+    }
+
+    [Fact]
     public async Task ParseFileAsync_MapsWildcardVersionToAny()
     {
         var packages = await ParseAsync();

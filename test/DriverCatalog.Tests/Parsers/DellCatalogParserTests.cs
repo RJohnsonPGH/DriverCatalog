@@ -24,7 +24,7 @@ public class DellCatalogParserTests
     {
         var packages = await ParseAsync();
 
-        Assert.Equal(1429, packages.Count);
+        Assert.Equal(1445, packages.Count);
     }
 
     [Fact]
@@ -34,6 +34,14 @@ public class DellCatalogParserTests
 
         Assert.All(packages, package => Assert.Equal(OSBuild.Any, package.OSBuild));
         Assert.All(packages, package => Assert.Null(package.BuildNumber));
+    }
+
+    [Fact]
+    public async Task ParseFileAsync_SampleCatalog_HasNoProblematicPackages()
+    {
+        var packages = await ParseAsync();
+
+        Assert.DoesNotContain(packages, p => p is ProblematicDriverPackage);
     }
 
     [Fact]
