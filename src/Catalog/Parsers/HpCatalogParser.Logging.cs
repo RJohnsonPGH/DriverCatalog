@@ -84,4 +84,7 @@ public sealed partial class HpCatalogParser
 
     [LoggerMessage(EventId = 26, Level = LogLevel.Debug, Message = "Parsed HP OS info: OS={Os}, Build={Build}")]
     private partial void LogParsedOsInfo(Product os, OSBuild build);
+
+    [LoggerMessage(EventId = 28, Level = LogLevel.Warning, Message = "HP driver package '{FileName}' has a download URL outside the allowed hosts: {DownloadUrl}")]
+    private partial void LogUnexpectedDownloadHost(string fileName, string downloadUrl);
 }

@@ -311,6 +311,12 @@ public sealed partial class MicrosoftCatalogParser(ILogger<MicrosoftCatalogParse
             Filename = file.Name
         };
 
+        if (!DownloadUrlWhitelist.TryValidate(file.Url, DownloadUrlWhitelist.Microsoft, out var urlError))
+        {
+            LogUnexpectedDownloadHost(file.Name, file.Url);
+            errors.Add(urlError);
+        }
+
         // Note: date-stamped pre-2019 packages map to OSBuild.Unknown on purpose and are not
         // problematic - there is no build number to map and nothing for the parser to fix.
         package = errors.Count > 0

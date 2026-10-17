@@ -69,4 +69,7 @@ public sealed partial class DellCatalogParser
 
     [LoggerMessage(EventId = 21, Level = LogLevel.Warning, Message = "Dell driver package has invalid value for attribute 'dateTime': {Value}")]
     private partial void LogInvalidReleaseDate(string value);
+
+    [LoggerMessage(EventId = 22, Level = LogLevel.Warning, Message = "Dell driver package '{FileName}' has a download URL outside the allowed hosts: {DownloadUrl}")]
+    private partial void LogUnexpectedDownloadHost(string fileName, string downloadUrl);
 }

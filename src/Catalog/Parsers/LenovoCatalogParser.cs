@@ -198,6 +198,13 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
                     .Distinct()
                     .ToList();
 
+                // The consolidated package is also problematic when its download URL is not a Lenovo host.
+                if (!DownloadUrlWhitelist.TryValidate(group.Key.DownloadUrl, DownloadUrlWhitelist.Lenovo, out var urlError))
+                {
+                    LogUnexpectedDownloadHost(group.Key.FileName, group.Key.DownloadUrl);
+                    errors.Add(urlError);
+                }
+
                 return errors.Count > 0 ? ProblematicDriverPackage.Create(package, errors) : package;
             })
             .ToList();

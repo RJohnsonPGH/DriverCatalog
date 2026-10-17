@@ -51,4 +51,7 @@ public sealed partial class MicrosoftCatalogParser
 
     [LoggerMessage(EventId = 16, Level = LogLevel.Debug, Message = "Parsed Surface package {Filename} for {Model}.")]
     private partial void LogParsedPackage(string fileName, string model);
+
+    [LoggerMessage(EventId = 17, Level = LogLevel.Warning, Message = "Surface package '{Filename}' has a download URL outside the allowed hosts: {DownloadUrl}")]
+    private partial void LogUnexpectedDownloadHost(string fileName, string downloadUrl);
 }

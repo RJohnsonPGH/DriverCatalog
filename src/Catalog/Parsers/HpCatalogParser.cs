@@ -412,6 +412,13 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
                     .Distinct()
                     .ToList();
 
+                // The consolidated package is also problematic when its download URL is not an HP host.
+                if (!DownloadUrlWhitelist.TryValidate(group.Key.DownloadUrl, DownloadUrlWhitelist.Hp, out var urlError))
+                {
+                    LogUnexpectedDownloadHost(group.Key.FileName, group.Key.DownloadUrl);
+                    errors.Add(urlError);
+                }
+
                 return errors.Count > 0 ? ProblematicDriverPackage.Create(package, errors) : package;
             })
             .ToList();
