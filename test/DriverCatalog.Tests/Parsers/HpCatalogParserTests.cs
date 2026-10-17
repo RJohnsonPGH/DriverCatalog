@@ -139,6 +139,46 @@ public class HpCatalogParserTests
         Assert.Equal(url, package.DownloadUrl);
     }
 
+    [Fact]
+    public async Task ParseFileAsync_SoftPaqMetadata_SurfacesTheSoftPaqSha256()
+    {
+        // The parser already reads SHA256 from the SoftPaqList; it must reach the output package,
+        // normalized to lower case.
+        const string upper = "2583E977168F9FD8E31AB11DFFCAFD7ACAEA86DEB7A52E07C8D0BCE261DBA5F1";
+
+        var packages = await ParseXmlAsync(BuildCatalogXmlWithSoftPaq(upper));
+
+        var package = Assert.Single(packages);
+        Assert.Equal(upper.ToLowerInvariant(), package.Sha256);
+    }
+
+    private static string BuildCatalogXmlWithSoftPaq(string sha256) =>
+        $"""
+        <?xml version="1.0" encoding="utf-8"?>
+        <NewDataSet>
+          <HPClientDriverPackCatalog>
+            <ProductOSDriverPackList>
+              <ProductOSDriverPack>
+                <SystemName>Test System</SystemName>
+                <OSName>Windows 11 64-bit, 24H2</OSName>
+                <SystemId>TESTID</SystemId>
+                <SoftPaqId>sp1</SoftPaqId>
+                <Architecture>64-bit</Architecture>
+              </ProductOSDriverPack>
+            </ProductOSDriverPackList>
+            <SoftPaqList>
+              <SoftPaq>
+                <Id>sp1</Id>
+                <Name>Test SoftPaq</Name>
+                <Version>1.0</Version>
+                <Url>https://ftp.hp.com/pub/softpaq/sp1.exe</Url>
+                <SHA256>{sha256}</SHA256>
+              </SoftPaq>
+            </SoftPaqList>
+          </HPClientDriverPackCatalog>
+        </NewDataSet>
+        """;
+
     private static string BuildCatalogXml(string osName, string url) =>
         $"""
         <?xml version="1.0" encoding="utf-8"?>

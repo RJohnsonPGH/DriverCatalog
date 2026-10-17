@@ -116,7 +116,8 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
             string Version,
             string DownloadUrl,
             DateTime? ReleaseDate,
-            string FileName
+            string FileName,
+            string? Sha256
         )>();
 
         foreach (XPathNavigator packNavigator in driverPacks)
@@ -237,6 +238,7 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
             string? version = null;
             DateTime? releaseDate = null;
             string? fileName = null;
+            string? sha256 = null;
 
             if (!string.IsNullOrWhiteSpace(softPaqId) && softPaqMetadata.TryGetValue(softPaqId, out var softPaqEntry))
             {
@@ -273,6 +275,11 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
                     {
                         releaseDate = dt;
                     }
+                }
+
+                if (!string.IsNullOrWhiteSpace(softPaqEntry.SHA256))
+                {
+                    sha256 = softPaqEntry.SHA256.Trim().ToLowerInvariant();
                 }
             }
             else
@@ -366,7 +373,8 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
                 version,
                 downloadUrl.ToString(),
                 releaseDate,
-                fileName
+                fileName,
+                sha256
             ));
 
             count++;
@@ -403,6 +411,7 @@ public sealed partial class HpCatalogParser(ILogger<HpCatalogParser> logger, ICa
                     DownloadUrl = group.Key.DownloadUrl,
                     ReleaseDate = group.Key.ReleaseDate,
                     Filename = group.Key.FileName,
+                    Sha256 = group.First().Sha256,
                 };
 
                 // The consolidated package is problematic when any source row could not be fully mapped.

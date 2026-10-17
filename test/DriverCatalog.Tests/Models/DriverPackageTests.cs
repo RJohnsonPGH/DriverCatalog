@@ -68,4 +68,24 @@ public class DriverPackageTests
 
         Assert.Equal(a.Id, b.Id);
     }
+
+    [Fact]
+    public void Id_DoesNotDependOnSha256()
+    {
+        var withoutHash = TestPackages.Create();
+        var withHash = TestPackages.Create(sha256: "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234");
+
+        Assert.Equal(withoutHash.Id, withHash.Id);
+    }
+
+    [Fact]
+    public void ProblematicCreate_PreservesSha256()
+    {
+        const string hash = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234";
+
+        var plain = TestPackages.Create(sha256: hash);
+        var problematic = ProblematicDriverPackage.Create(plain, ["some error"]);
+
+        Assert.Equal(hash, problematic.Sha256);
+    }
 }

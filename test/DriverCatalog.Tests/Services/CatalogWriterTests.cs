@@ -102,6 +102,29 @@ public class CatalogWriterTests : IDisposable
     }
 
     [Fact]
+    public async Task WritePackagesAsync_WritesSha256_WhenPresent_AndOmitsItWhenNull()
+    {
+        const string hash = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234";
+        var packages = new[]
+        {
+            TestPackages.Create(model: "Hashed", sha256: hash),
+            TestPackages.Create(model: "Plain")
+        };
+        var outputPath = Path.Combine(_directory, "hashes.json");
+        var writer = new CatalogWriter(NullLogger<CatalogWriter>.Instance);
+
+        await writer.WritePackagesAsync(packages, outputPath, TestContext.Current.CancellationToken);
+
+        var json = File.ReadAllText(outputPath);
+        Assert.Contains("\"sha256\": \"abcd1234", json);
+
+        var loaded = JsonSerializer.Deserialize<List<DriverPackage>>(json, CatalogJson.Options);
+        Assert.NotNull(loaded);
+        Assert.Equal(hash, loaded!.Single(p => p.Model == "Hashed").Sha256);
+        Assert.Null(loaded.Single(p => p.Model == "Plain").Sha256);
+    }
+
+    [Fact]
     public async Task WriteAsync_OmitsNullBuildNumber_AndUsesCamelCasePropertyNames()
     {
         var catalog = new DriverCatalogFile

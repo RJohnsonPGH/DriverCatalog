@@ -92,7 +92,8 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
             string DownloadUrl,
             DateTime? ReleaseDate,
             string FileName,
-            bool HasSupplementalPackages
+            bool HasSupplementalPackages,
+            string? Sha256
         )>();
 
         var modelName = modelElement.Attribute("name")?.Value;
@@ -117,6 +118,10 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
             var osName = sccmElement.Attribute("os")?.Value;
             var url = sccmElement.Value;
             var releaseDate = sccmElement.Attribute("date")?.Value;
+
+            // The "crc" attribute carries the package file's SHA256 (64 hex characters).
+            var sha256Attr = sccmElement.Attribute("crc")?.Value;
+            var sha256 = string.IsNullOrWhiteSpace(sha256Attr) ? null : sha256Attr.Trim().ToLowerInvariant();
 
             if (string.IsNullOrWhiteSpace(osVersion) ||
                 string.IsNullOrWhiteSpace(osName) ||
@@ -153,7 +158,8 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
                 downloadUrl.ToString(),
                 parsedReleaseDate,
                 Path.GetFileName(new Uri(url).LocalPath),
-                hasGfx
+                hasGfx,
+                sha256
             ));
         }
 
@@ -188,7 +194,8 @@ public sealed partial class LenovoCatalogParser(ILogger<LenovoCatalogParser> log
                     DownloadUrl = group.Key.DownloadUrl,
                     ReleaseDate = group.Key.ReleaseDate,
                     Filename = group.Key.FileName,
-                    HasSupplementalPackages = group.Key.HasSupplementalPackages
+                    HasSupplementalPackages = group.Key.HasSupplementalPackages,
+                    Sha256 = group.First().Sha256
                 };
 
                 // The consolidated package is problematic when any source row could not be fully mapped.
