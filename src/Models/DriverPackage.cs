@@ -84,6 +84,13 @@ public class DriverPackage
     public long? FileSize { get; set; }
 
     /// <summary>
+    /// Gets or sets the SHA256 hash of the driver package file, normalized to lower-case hexadecimal.
+    /// Populated when the source catalog publishes a hash so consumers can verify download integrity.
+    /// Null when the source provides none (e.g. Microsoft, VMware, HP WinPE).
+    /// </summary>
+    public string? Sha256 { get; init; }
+
+    /// <summary>
     /// Gets or sets the file name of the driver package.
     /// </summary>
     public required string Filename { get; set; }

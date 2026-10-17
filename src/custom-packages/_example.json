@@ -20,6 +20,7 @@
     "releaseDate": "2026-05-01T00:00:00Z", // optional
     "fileSize": 1234567,                  // optional, size in bytes
     "filename": "ThinkPad_X1C_G11_Fingerprint_3.100.22.exe", // required
+    "sha256": "e3b0c44298fc1c149afbf1d1f82f6e05c5a1b0f0d0b1a0c0e0d0c0b0a0908070", // optional: file SHA256 (lowercase hex) for download integrity; omit when unknown
     "hasSupplementalPackages": false      // optional (Lenovo GFX supplemental packages)
   }
 ]

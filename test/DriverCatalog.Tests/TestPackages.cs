@@ -16,7 +16,8 @@ public static class TestPackages
         string downloadUrl = "https://example.com/a.cab",
         List<Product>? operatingSystems = null,
         string? buildNumber = null,
-        List<string>? baseboards = null)
+        List<string>? baseboards = null,
+        string? sha256 = null)
     {
         return new DriverPackage
         {
@@ -31,6 +32,7 @@ public static class TestPackages
             IsWinPE = false,
             IsCab = true,
             DownloadUrl = downloadUrl,
+            Sha256 = sha256,
             Filename = Path.GetFileName(new Uri(downloadUrl).AbsolutePath)
         };
     }
@@ -45,7 +47,8 @@ public static class TestPackages
         string downloadUrl = "https://example.com/a.cab",
         List<Product>? operatingSystems = null,
         string? buildNumber = null,
-        List<string>? baseboards = null)
+        List<string>? baseboards = null,
+        string? sha256 = null)
     {
         return new ProblematicDriverPackage
         {
@@ -60,6 +63,7 @@ public static class TestPackages
             IsWinPE = false,
             IsCab = true,
             DownloadUrl = downloadUrl,
+            Sha256 = sha256,
             Filename = Path.GetFileName(new Uri(downloadUrl).AbsolutePath),
             Errors = [error]
         };

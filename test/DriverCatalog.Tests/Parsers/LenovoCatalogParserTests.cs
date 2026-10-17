@@ -77,4 +77,26 @@ public class LenovoCatalogParserTests
         Assert.Equal(199, older.Count);
         Assert.All(older, package => Assert.Equal(OSBuild.Build1909, package.OSBuild));
     }
+
+    [Fact]
+    public async Task ParseFileAsync_ReadsTheSha256FromTheSccmCrcAttribute()
+    {
+        var packages = await ParseAsync();
+
+        // The "crc" attribute on the SCCM element carries the file SHA256; it must reach the
+        // package, normalized to lower case.
+        var package = packages.Single(p => p.DownloadUrl.EndsWith("tc_m715q_w1064_201804.exe", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal("7fe8d36616d9154c1252843d7541ecff436964c363d533e2389aae50a06e0083", package.Sha256);
+    }
+
+    [Fact]
+    public async Task ParseFileAsync_EveryPackageHash_IsLowercaseHex64OrNull()
+    {
+        var packages = await ParseAsync();
+
+        Assert.Contains(packages, p => p.Sha256 is not null);
+        Assert.All(packages.Where(p => p.Sha256 is not null),
+            p => Assert.Matches("^[0-9a-f]{64}$", p.Sha256!));
+    }
 }

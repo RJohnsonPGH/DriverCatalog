@@ -134,7 +134,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
         bool isCab)
     {
         // Extract and validate common package information
-        if (!TryExtractCommonPackageInfo(nav, namespaceManager, "WinPE", out var packageName, out var osInfoList, out var version, out var path, out var releaseDate, out var fileSize))
+        if (!TryExtractCommonPackageInfo(nav, namespaceManager, "WinPE", out var packageName, out var osInfoList, out var version, out var path, out var releaseDate, out var fileSize, out var sha256))
         {
             return null;
         }
@@ -159,6 +159,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
             path,
             releaseDate,
             fileSize,
+            sha256,
             isWinPE: true,
             isCab: isCab);
     }
@@ -169,7 +170,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
         bool isCab)
     {
         // Extract and validate common package information
-        if (!TryExtractCommonPackageInfo(nav, namespaceManager, "Windows", out var packageName, out var osInfoList, out var version, out var path, out var releaseDate, out var fileSize))
+        if (!TryExtractCommonPackageInfo(nav, namespaceManager, "Windows", out var packageName, out var osInfoList, out var version, out var path, out var releaseDate, out var fileSize, out var sha256))
         {
             return null;
         }
@@ -205,6 +206,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
             path,
             releaseDate,
             fileSize,
+            sha256,
             isWinPE: false,
             isCab: isCab);
     }
@@ -338,7 +340,8 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
         [NotNullWhen(true)] out string? version,
         [NotNullWhen(true)] out string? path,
         out DateTime releaseDate,
-        out long? fileSize)
+        out long? fileSize,
+        out string? sha256)
     {
         packageName = null;
         osInfoList = null;
@@ -346,6 +349,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
         path = null;
         releaseDate = default;
         fileSize = null;
+        sha256 = null;
 
         // Get package display name
         var nameNode = nav.SelectSingleNode("dell:Name/dell:Display", namespaceManager);
@@ -365,7 +369,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
         }
 
         // Parse package metadata
-        if (!TryParsePackageMetadata(nav, namespaceManager, out version, out path, out releaseDate, out fileSize))
+        if (!TryParsePackageMetadata(nav, namespaceManager, out version, out path, out releaseDate, out fileSize, out sha256))
         {
             return false;
         }
@@ -385,6 +389,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
         string path,
         DateTime releaseDate,
         long? fileSize,
+        string? sha256,
         bool isWinPE,
         bool isCab)
     {
@@ -417,6 +422,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
                 DownloadUrl = downloadUrl,
                 ReleaseDate = releaseDate,
                 FileSize = fileSize,
+                Sha256 = sha256,
                 Filename = fileName,
             };
 
@@ -556,12 +562,14 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
         [NotNullWhen(true)] out string? version,
         [NotNullWhen(true)] out string? path,
         out DateTime releaseDate,
-        out long? fileSize)
+        out long? fileSize,
+        out string? sha256)
     {
         version = null;
         path = null;
         releaseDate = default;
         fileSize = null;
+        sha256 = null;
 
         // Parse version
         version = navigator.GetAttribute("dellVersion", string.Empty);
@@ -606,6 +614,13 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
         {
             fileSize = parsedSize;
         }
+
+        // Parse the file SHA256 (optional). Select only the Cryptography block that is a direct
+        // child of the package (the file's own hash); the block under DriverPackMetadataInfo hashes
+        // the per-package metadata XML and is a different value.
+        var sha256Node = navigator.SelectSingleNode(
+            "dell:Cryptography/dell:Hash[@algorithm='SHA256']", namespaceManager);
+        sha256 = string.IsNullOrWhiteSpace(sha256Node?.Value) ? null : sha256Node!.Value.Trim().ToLowerInvariant();
 
         return true;
     }

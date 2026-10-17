@@ -53,6 +53,19 @@ public class CustomPackageLoaderTests : IDisposable
     }
 
     [Fact]
+    public void LoadAll_ReadsTheOptionalSha256()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(
+            Path.Combine(_directory, "hashed.json"),
+            """[{"manufacturer":"Dell","model":"H","baseboards":[],"operatingSystems":["Windows11"],"osBuild":"Any","architecture":"x64","version":"1.0","isWinPE":false,"isCab":true,"downloadUrl":"https://example.com/h.cab","filename":"h.cab","sha256":"abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"}]""");
+
+        var package = Assert.Single(Loader.LoadAll(_directory));
+
+        Assert.Equal("abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234", package.Sha256);
+    }
+
+    [Fact]
     public void LoadAll_Throws_WhenAFileContainsInvalidJson()
     {
         Directory.CreateDirectory(_directory);

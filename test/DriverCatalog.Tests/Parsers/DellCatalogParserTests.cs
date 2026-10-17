@@ -58,4 +58,17 @@ public class DellCatalogParserTests
         Assert.True(package.IsCab);
         Assert.Equal(Manufacturer.Dell, package.Manufacturer);
     }
+
+    [Fact]
+    public async Task ParseFileAsync_UsesThePackageFileHash_NotTheMetadataFileHash()
+    {
+        var packages = await ParseAsync();
+
+        // 160-vista-A01-JFH0G.CAB: the Cryptography block that is a direct child of the package
+        // holds the file hash; the block under DriverPackMetadataInfo hashes the metadata XML and
+        // is a different value. The parser must select the former, lower-cased.
+        var package = packages.Single(p => p.DownloadUrl.EndsWith("160-vista-A01-JFH0G.CAB", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal("5c7ac089be1dbed5341b1cbc633f5b027358bd257a444e2a7677787a15bba36b", package.Sha256);
+    }
 }

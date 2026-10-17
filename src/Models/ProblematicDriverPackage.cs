@@ -34,6 +34,7 @@ public sealed class ProblematicDriverPackage : DriverPackage
         DownloadUrl = package.DownloadUrl,
         ReleaseDate = package.ReleaseDate,
         FileSize = package.FileSize,
+        Sha256 = package.Sha256,
         Filename = package.Filename,
         HasSupplementalPackages = package.HasSupplementalPackages,
         Errors = errors

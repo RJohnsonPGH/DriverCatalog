@@ -10,6 +10,8 @@ Builds a combined driver catalog as a single JSON file from OEM sources: Dell, H
 
 Every package carries a deterministic `id` (SHA-256 of manufacturer, model, version, architecture, OS build, OS list, and baseboards). The same package keeps the same id across releases, even if its download URL changes.
 
+Packages from sources that publish a file checksum also carry a `sha256` field (lower-case hexadecimal) so consumers can verify download integrity. Dell, HP, and Lenovo provide it; Microsoft, VMware, and HP WinPE do not, and their packages omit the field.
+
 Packages a parser could not fully map (e.g. an OS build with no known enum value) are kept in the catalog and additionally written to `<output>.problematic.json` with the reasons why. The workflow files a GitHub issue for each problematic package (deduplicated by package id) so parser gaps get fixed and tested.
 
 ## Output format
