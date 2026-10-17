@@ -264,6 +264,13 @@ public sealed partial class VMwareCatalogParser(ILogger<VMwareCatalogParser> log
                 HasSupplementalPackages = false
             };
 
+            if (!DownloadUrlWhitelist.TryValidate(package.DownloadUrl, DownloadUrlWhitelist.VMware, out var urlError))
+            {
+                LogUnexpectedDownloadHost(href, package.DownloadUrl);
+                packages.Add(ProblematicDriverPackage.Create(package, [urlError]));
+                continue;
+            }
+
             packages.Add(package);
 
             LogParsedFile(href, fileVersion, build, architecture);

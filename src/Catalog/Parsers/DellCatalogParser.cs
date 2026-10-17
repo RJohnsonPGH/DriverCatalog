@@ -376,7 +376,7 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
     /// <summary>
     /// Creates driver packages from parsed information, grouping by Build/Arch combination.
     /// </summary>
-    private static List<DriverPackage> CreateDriverPackages(
+    private List<DriverPackage> CreateDriverPackages(
         string fileName,
         string model,
         List<string> systemIds,
@@ -401,6 +401,8 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
             // Distinct products once per group
             var products = group.Select(info => info.product).Distinct().ToList();
 
+            var downloadUrl = new Uri(BaseUri, path).ToString();
+
             var driverPackage = new DriverPackage
             {
                 Manufacturer = Manufacturer.Dell,
@@ -412,11 +414,18 @@ public sealed partial class DellCatalogParser(ILogger<DellCatalogParser> logger,
                 Version = version,
                 IsWinPE = isWinPE,
                 IsCab = isCab,
-                DownloadUrl = new Uri(BaseUri, path).ToString(),
+                DownloadUrl = downloadUrl,
                 ReleaseDate = releaseDate,
                 FileSize = fileSize,
                 Filename = fileName,
             };
+
+            if (!DownloadUrlWhitelist.TryValidate(downloadUrl, DownloadUrlWhitelist.Dell, out var urlError))
+            {
+                LogUnexpectedDownloadHost(fileName, downloadUrl);
+                packages.Add(ProblematicDriverPackage.Create(driverPackage, [urlError]));
+                continue;
+            }
 
             packages.Add(driverPackage);
         }

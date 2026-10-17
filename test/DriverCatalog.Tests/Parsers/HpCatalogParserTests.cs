@@ -107,26 +107,61 @@ public class HpCatalogParserTests
     {
         // The checked-in fixture only contains known builds, so a minimal catalog with an
         // unrecognized build token exercises the problematic-package path.
-        var xml = """
-            <?xml version="1.0" encoding="utf-8"?>
-            <NewDataSet>
-              <HPClientDriverPackCatalog>
-                <ProductOSDriverPackList>
-                  <ProductOSDriverPack>
-                    <SystemName>Test System</SystemName>
-                    <OSId></OSId>
-                    <OSName>Windows 10 64-bit, 99H9</OSName>
-                    <SystemId>TESTID</SystemId>
-                    <Version>1.0</Version>
-                    <Url>https://example.com/test.exe</Url>
-                    <DateReleased>2026-01-01</DateReleased>
-                    <Architecture>64-bit</Architecture>
-                  </ProductOSDriverPack>
-                </ProductOSDriverPackList>
-              </HPClientDriverPackCatalog>
-            </NewDataSet>
-            """;
+        var packages = await ParseXmlAsync(BuildCatalogXml("Windows 10 64-bit, 99H9", "https://ftp.hp.com/test.exe"));
 
+        var problematic = Assert.IsType<ProblematicDriverPackage>(Assert.Single(packages));
+        Assert.Equal(OSBuild.Unknown, problematic.OSBuild);
+        Assert.Equal("Windows 10 64-bit, 99H9", problematic.BuildNumber);
+        Assert.Contains("99H9", problematic.Errors[0]);
+    }
+
+    [Theory]
+    [InlineData("https://downloads.dell.com/test.exe")]
+    [InlineData("https://example.com/test.exe")]
+    public async Task ParseFileAsync_DownloadUrlOutsideTheHpHosts_YieldsAProblematicPackage(string url)
+    {
+        var packages = await ParseXmlAsync(BuildCatalogXml("Windows 10 64-bit, 24H2", url));
+
+        var problematic = Assert.IsType<ProblematicDriverPackage>(Assert.Single(packages));
+        Assert.Equal(url, problematic.DownloadUrl);
+        Assert.Contains("ftp.hp.com", Assert.Single(problematic.Errors));
+    }
+
+    [Theory]
+    [InlineData("https://ftp.hp.com/test.exe")]
+    [InlineData("https://ftp.ext.hp.com/test.exe")]
+    public async Task ParseFileAsync_DownloadUrlOnAnHpHost_IsNotProblematic(string url)
+    {
+        var packages = await ParseXmlAsync(BuildCatalogXml("Windows 10 64-bit, 24H2", url));
+
+        var package = Assert.Single(packages);
+        Assert.False(package is ProblematicDriverPackage);
+        Assert.Equal(url, package.DownloadUrl);
+    }
+
+    private static string BuildCatalogXml(string osName, string url) =>
+        $"""
+        <?xml version="1.0" encoding="utf-8"?>
+        <NewDataSet>
+          <HPClientDriverPackCatalog>
+            <ProductOSDriverPackList>
+              <ProductOSDriverPack>
+                <SystemName>Test System</SystemName>
+                <OSId></OSId>
+                <OSName>{osName}</OSName>
+                <SystemId>TESTID</SystemId>
+                <Version>1.0</Version>
+                <Url>{url}</Url>
+                <DateReleased>2026-01-01</DateReleased>
+                <Architecture>64-bit</Architecture>
+              </ProductOSDriverPack>
+            </ProductOSDriverPackList>
+          </HPClientDriverPackCatalog>
+        </NewDataSet>
+        """;
+
+    private static async Task<List<DriverPackage>> ParseXmlAsync(string xml)
+    {
         var path = Path.Combine(Path.GetTempPath(), "driver-catalog-tests", Guid.NewGuid().ToString("N"), "hp.xml");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, xml);
@@ -141,10 +176,7 @@ public class HpCatalogParserTests
                 packages.Add(package);
             }
 
-            var problematic = Assert.IsType<ProblematicDriverPackage>(Assert.Single(packages));
-            Assert.Equal(OSBuild.Unknown, problematic.OSBuild);
-            Assert.Equal("Windows 10 64-bit, 99H9", problematic.BuildNumber);
-            Assert.Contains("99H9", problematic.Errors[0]);
+            return packages;
         }
         finally
         {

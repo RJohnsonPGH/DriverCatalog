@@ -24,4 +24,7 @@ public sealed partial class LenovoCatalogParser
 
     [LoggerMessage(EventId = 7, Level = LogLevel.Debug, Message = "Parsed Lenovo OS info: OS={Os}, Build={Build}")]
     private partial void LogParsedOsInfo(Product os, OSBuild build);
+
+    [LoggerMessage(EventId = 8, Level = LogLevel.Warning, Message = "Lenovo driver package '{FileName}' has a download URL outside the allowed hosts: {DownloadUrl}")]
+    private partial void LogUnexpectedDownloadHost(string fileName, string downloadUrl);
 }

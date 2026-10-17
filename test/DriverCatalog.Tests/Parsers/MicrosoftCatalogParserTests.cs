@@ -78,6 +78,16 @@ public class MicrosoftCatalogParserTests
             "</script></body></html>";
     }
 
+    private static string DetailPageWithUrl(string title, string fileName, string url) =>
+        "<html><body><script>window.__DLCDetails__=" +
+        "{\"dlcDetailsView\":{\"error\":\"\",\"downloadTitle\":\"" + title + "\"," +
+        "\"downloadDescription\":\"All current drivers and firmware\"," +
+        "\"downloadFile\":[{\"isPrimary\":\"False\",\"name\":\"" + fileName +
+        "\",\"url\":\"" + url +
+        "\",\"size\":\"1048576\",\"version\":\"1\",\"datePublished\":\"9/2/2026 6:43:38 PM\"}]," +
+        "\"systemRequirementsSection_supportedOS\":[\"Windows 11\"]}}" +
+        "</script></body></html>";
+
     private static Dictionary<string, string> StandardPages()
     {
         return new Dictionary<string, string>
@@ -281,5 +291,23 @@ public class MicrosoftCatalogParserTests
         var packages = await ParseAsync(pages);
 
         Assert.Empty(packages);
+    }
+
+    [Fact]
+    public async Task ParseAsync_DownloadUrlOutsideMicrosoftHosts_YieldsAProblematicPackage()
+    {
+        const string fileName = "SurfacePro12withIntel_Win11_26100_26.063.29018.0.msi";
+        var url = "https://downloads.dell.com/" + fileName;
+
+        var pages = StandardPages();
+        pages["/en-us/download/details.aspx?id=101"] = DetailPageWithUrl(
+            "Surface Pro for Business 12th Edition with Intel", fileName, url);
+
+        var packages = await ParseAsync(pages);
+
+        var problematic = Assert.IsType<ProblematicDriverPackage>(
+            Assert.Single(packages, package => package.Filename == fileName));
+        Assert.Equal(url, problematic.DownloadUrl);
+        Assert.Contains("download.microsoft.com", Assert.Single(problematic.Errors));
     }
 }

@@ -120,7 +120,13 @@ public sealed partial class HpWinPeCatalogParser(ILogger<HpWinPeCatalogParser> l
         }
 
         // Extract file name from URL
-        var fileName = Path.GetFileName(new Uri(downloadUrl).AbsolutePath);
+        if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var downloadUri))
+        {
+            LogInvalidDownloadUrl(softPaqId, downloadUrl);
+            return null;
+        }
+
+        var fileName = Path.GetFileName(downloadUri.AbsolutePath);
 
         // Parse release date
         DateTime? releaseDate = null;
@@ -138,7 +144,7 @@ public sealed partial class HpWinPeCatalogParser(ILogger<HpWinPeCatalogParser> l
         LogParsedPack(softPaqId, version, winPeVersion);
 
         // Create a single package with all supported operating systems
-        return new DriverPackage
+        var driverPackage = new DriverPackage
         {
             Manufacturer = Manufacturer.HP,
             Model = ModelName,
@@ -155,6 +161,15 @@ public sealed partial class HpWinPeCatalogParser(ILogger<HpWinPeCatalogParser> l
             Filename = fileName,
             HasSupplementalPackages = false
         };
+
+        // A pack linked from anywhere other than HP's FTP hosts is reported rather than dropped.
+        if (!DownloadUrlWhitelist.TryValidate(downloadUrl, DownloadUrlWhitelist.Hp, out var urlError))
+        {
+            LogUnexpectedDownloadHost(softPaqId, downloadUrl);
+            return ProblematicDriverPackage.Create(driverPackage, [urlError]);
+        }
+
+        return driverPackage;
     }
 
     /// <summary>

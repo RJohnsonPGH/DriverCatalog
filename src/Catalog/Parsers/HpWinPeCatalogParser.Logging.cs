@@ -37,4 +37,10 @@ public sealed partial class HpWinPeCatalogParser
 
     [LoggerMessage(EventId = 12, Level = LogLevel.Warning, Message = "Unrecognized WinPE version: {WinPeVersion}")]
     private partial void LogUnrecognizedVersion(string winPeVersion);
+
+    [LoggerMessage(EventId = 13, Level = LogLevel.Warning, Message = "HP WinPE driver pack '{SoftPaqId}' has an invalid Url value: {Url}")]
+    private partial void LogInvalidDownloadUrl(string softPaqId, string url);
+
+    [LoggerMessage(EventId = 14, Level = LogLevel.Warning, Message = "HP WinPE driver pack '{SoftPaqId}' has a download URL outside the allowed hosts: {DownloadUrl}")]
+    private partial void LogUnexpectedDownloadHost(string softPaqId, string downloadUrl);
 }

@@ -48,4 +48,7 @@ public sealed partial class VMwareCatalogParser
 
     [LoggerMessage(EventId = 15, Level = LogLevel.Debug, Message = "Extracted file size '{SizeText}' ({FileSize} bytes).")]
     private partial void LogExtractedFileSize(string sizeText, long fileSize);
+
+    [LoggerMessage(EventId = 16, Level = LogLevel.Warning, Message = "VMware Tools file '{Href}' has a download URL outside the allowed hosts: {DownloadUrl}")]
+    private partial void LogUnexpectedDownloadHost(string href, string downloadUrl);
 }
